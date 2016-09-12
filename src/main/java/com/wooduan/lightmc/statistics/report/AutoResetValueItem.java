@@ -11,7 +11,8 @@ public class AutoResetValueItem extends ValueItem {
 	
 	public void saveAndReset(String name, Map<String, Object> output) {
 		save(name, output);
-		value.set(0);
+		reset();
+		resetMinMax();
 	}
 
 }

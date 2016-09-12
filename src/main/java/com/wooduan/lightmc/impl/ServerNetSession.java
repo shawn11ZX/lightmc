@@ -22,4 +22,10 @@ public class ServerNetSession extends AbstractNetSession {
 	public Channel getChannel() {
 		return channel;
 	}
+	
+	@Override
+	public String toString() {
+		
+		return '[' + getName() + ']' + channel.toString();
+	}
 }

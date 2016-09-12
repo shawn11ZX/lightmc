@@ -11,6 +11,9 @@ public class CumulativeValueItem extends ValueItem {
 	
 	public void saveAndReset(String name, Map<String, Object> output) {
 		save(name, output);
+		resetMinMax();
+		
 	}
 
+	
 }

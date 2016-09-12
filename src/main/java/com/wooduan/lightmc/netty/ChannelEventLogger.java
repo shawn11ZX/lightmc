@@ -8,6 +8,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPromise;
 
+import java.net.ConnectException;
 import java.net.SocketAddress;
 
 import org.slf4j.Logger;
@@ -24,7 +25,6 @@ public class ChannelEventLogger extends ChannelDuplexHandler {
 	final private NetSession session;
 	final private boolean treatExceptionAsInfo;
 	
-	private SocketAddress remoteAddr;
 	private boolean activeClose = false;
 	public ChannelEventLogger(NetSession session) {
 		this(session, false);
@@ -54,27 +54,54 @@ public class ChannelEventLogger extends ChannelDuplexHandler {
 			
 			if (treatExceptionAsInfo)
 			{
-				logger.info(msg, cause);
+				if (cause instanceof ConnectException)
+				{
+					logger.info(msg);
+				}
+				else 
+				{
+					logger.info(msg, cause);
+				}
 			}
 			else
 			{
-				logger.error(msg, cause);
+				if (cause instanceof ConnectException)
+				{
+					logger.error(msg);
+				}
+				else 
+				{
+					logger.error(msg, cause);
+				}
 			}
 		}
 		else
 		{
 			String msg = "exception happened in closed channel: info=" + getInfo()
-					+ ", attempt=" + remoteAddr
 					+ "(" + channel.id() + ")"
 					+ ", message=" + cause.getMessage();
 			
 			if (treatExceptionAsInfo)
 			{
-				logger.info(msg, cause);
+				if (cause instanceof ConnectException)
+				{
+					logger.info(msg);
+				}
+				else 
+				{
+					logger.info(msg, cause);
+				}
 			}
 			else
 			{
-				logger.error(msg, cause);
+				if (cause instanceof ConnectException)
+				{
+					logger.error(msg);
+				}
+				else 
+				{
+					logger.error(msg, cause);
+				}
 			}
 		}
 		
@@ -86,11 +113,9 @@ public class ChannelEventLogger extends ChannelDuplexHandler {
 	@Override
 	public void channelActive(ChannelHandlerContext ctx) throws Exception 
 	{
-		this.remoteAddr = ctx.channel().remoteAddress();
-		
-		logger.info("connected to {}, info={}, address={}({}), recvBufSize={}, sendBuf={}", 
-				remoteAddr
-				, getInfo()
+		logger.info("connected to {}, info={}, address={}({}), recvBufSize={}, sendBuf={}",
+				ctx.channel().remoteAddress(),
+				getInfo()
 				, ctx.channel().toString()
 				, ctx.channel().id()
 				, ctx.channel().config().getOption(ChannelOption.SO_RCVBUF)
@@ -119,8 +144,12 @@ public class ChannelEventLogger extends ChannelDuplexHandler {
 		
 		super.close(ctx, future);
 		
-		activeClose = true;
-		logger.info("channel active close: info={}, address={}({})", getInfo(), ctx.channel().toString(), ctx.channel().id());
+		if (ctx.channel().isActive())
+		{
+			activeClose = true;
+			logger.info("channel active close: info={}, address={}({})", getInfo(), ctx.channel().toString(), ctx.channel().id());
+		}
+		
 	}
 
 	@Override
@@ -151,6 +180,7 @@ public class ChannelEventLogger extends ChannelDuplexHandler {
 	
     @Override
     public void connect(ChannelHandlerContext ctx, SocketAddress remoteAddress, SocketAddress localAddress, ChannelPromise promise) {
+    	logger.info("try connecting to remote: info={}  address={}({})", getInfo(), remoteAddress, ctx.channel().id());
     	promise.addListener(new ChannelFutureListener() {
             @Override
             public void operationComplete(ChannelFuture future) {

@@ -10,7 +10,6 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.timeout.ReadTimeoutHandler;
-import io.netty.util.concurrent.DefaultEventExecutorGroup;
 import io.netty.util.concurrent.EventExecutorGroup;
 
 import java.net.InetSocketAddress;
@@ -22,9 +21,11 @@ import com.wooduan.lightmc.impl.ClientNetSession;
 import com.wooduan.lightmc.netty.ApcDispatchHandler;
 import com.wooduan.lightmc.netty.ChannelEventHandler;
 import com.wooduan.lightmc.netty.ChannelEventLogger;
+import com.wooduan.lightmc.netty.TimedEventExecutorGroup;
 import com.wooduan.lightmc.statistics.ApcStatisticRecorder;
 import com.wooduan.lightmc.statistics.DefaultApcStatisticRecorder;
-import com.wooduan.lightmc.statistics.report.NettyEventExecutorGroupMonitor;
+import com.wooduan.lightmc.statistics.report.EventExecutorGroupItem;
+import com.wooduan.lightmc.statistics.report.EventExecutorGroupItems;
 
 public class ApcClientFactory  {
 	private final static NioEventLoopGroup defaulNioEventLoopGroup = new NioEventLoopGroup(6);
@@ -36,10 +37,10 @@ public class ApcClientFactory  {
 		private ApcSerializer serializer;
 		private NioEventLoopGroup nioEventLoopGroup = defaulNioEventLoopGroup;
 		private boolean reliable = true;
-		private boolean treatExceptionAsInfo = true;
+		private boolean treatExceptionAsInfo = false;
 		private ApcStatisticRecorder statisticRecorder = DefaultApcStatisticRecorder.INSTANCE;
 		private String name = "unknown";
-		private int readTimeout = 60*60;
+		private int readTimeout = 0;
 		private int maxApcLength = Integer.MAX_VALUE;
 		private Map<ChannelOption<?>, Object> options = new HashMap<ChannelOption<?>, Object>();
 		private EventExecutorGroup apcExecutorGroup;
@@ -49,6 +50,7 @@ public class ApcClientFactory  {
 			
 			if (apcExecutorGroup == null)
 				throw new IllegalArgumentException("apc thread not initialized");
+			
 			ApcClientFactory rc = new ApcClientFactory(
 					serializer, 
 					apcExecutorGroup, 
@@ -61,34 +63,72 @@ public class ApcClientFactory  {
 					readTimeout,
 					maxApcLength,
 					options);
-			NettyEventExecutorGroupMonitor.monitorApcClientFactory(rc);
+			EventExecutorGroupItems.monitorApcClientFactory(rc);
 			return rc;
 		}
 		
-		public void setIoThreadCount(int count) {
-			this.nioEventLoopGroup = new NioEventLoopGroup(count);;
+		/**
+		 * 设置io线程个数，io线程用于网络收发报文，报文编解码
+		 * @param count io线程个数
+		 * @return Builder
+		 */
+		public Builder setIoThreadCount(int count) {
+			this.nioEventLoopGroup = new NioEventLoopGroup(count);
+			return this;
 		}
 		
+		/**
+		 * 注册回调函数
+		 * @param instance 实现了interfaceClazz实例
+		 * @param interfaceClazz 需要被注册的方法集合
+		 * @param <T> 方法集合接口类型
+		 * @param <O> 实例接口类型
+		 * @return Builder
+		 */
 		public <O extends T, T> Builder registerCallback(O instance, Class<T> interfaceClazz) {
 			dispatcher.registerMethod(instance, interfaceClazz);
 			return this;
 		}
 		
+		
+		/**
+		 * 设置APC处理线程个数，APC处理线程用来处理APC报文并调用回调函数
+		 * 该函数与setApcExecutorGroup只能有一个被调用
+		 * @param count APC处理线程个数
+		 * @return Builder
+		 */
 		public Builder setApcThreadCount(int count) {
-			this.apcExecutorGroup = new DefaultEventExecutorGroup(count);
+			this.apcExecutorGroup = new TimedEventExecutorGroup(count);
 			return this;
 		}
 		
+		
+		/**
+		 * 设置APC处理线程池，APC处理线程用来处理APC报文并调用回调函数
+		 * 该函数与setApcExecutorGroup只能有一个被调用
+		 * @param group APC处理线程池
+		 * @return Builder
+		 */
 		public Builder setApcExecutorGroup(EventExecutorGroup group) {
 			this.apcExecutorGroup = group;
 			return this;
 		}
-		
+
+		/**
+		 * 设置APC的序列号逻辑
+		 * @param serializer  serializer
+		 * @return Builder
+		 */
 		public Builder setApcSerializer(ApcSerializer serializer) {
 			this.serializer = serializer;
 			return this;
 		}
 		
+		/**
+		 * 设置时间偶讲异常打印成INFO，默认为false（即ERROR)
+		 * @param treatExceptionAsInfo treatExceptionAsInfo
+		 * @return Builder
+		 */
 		public Builder setTreatExceptionAsInfo(boolean treatExceptionAsInfo) {
 			this.treatExceptionAsInfo = treatExceptionAsInfo;
 			return this;
@@ -99,6 +139,18 @@ public class ApcClientFactory  {
 			return this;
 		}
 		
+		
+		/**
+		 * 设置是否在netty Channel writable为false时，继续写入。
+		 * 当为true时，如果netty一直发送不出去，会导致内存增长
+		 * @param reliable  是否在netty Channel writable为false时，继续写入
+		 * @return Builder
+		 */
+		public Builder setReliable(boolean reliable) {
+			this.reliable = reliable;
+			return this;
+		}
+
 		public ApcStatisticRecorder getStatisticRecorder() {
 			return statisticRecorder;
 		}
@@ -108,11 +160,21 @@ public class ApcClientFactory  {
 			return this;
 		}
 		
+		/**
+		 * 设置idle超时时间（秒），超过这个时间会断开连接。0表示不超时
+		 * @param readTimeout 超时时间（秒）
+		 * @return Builder
+		 */
 		public Builder setReadTimeout(int readTimeout) {
 			this.readTimeout = readTimeout;
 			return this;
 		}
 	
+		/**
+		 * 设置序列号后最大APC长度
+		 * @param maxApcLength maxApcLength
+		 * @return Builder
+		 */
 		public Builder setMaxApcLength(int maxApcLength) {
 			this.maxApcLength = maxApcLength;
 			return this;
@@ -129,10 +191,25 @@ public class ApcClientFactory  {
 			return this;
 		}
 		
+		/**
+		 * 用于测试，忽略某些函数
+		 * @param functionName 忽略某些函数名
+		 * @return Builder
+		 */
 		public Builder addIgnoredFunction(String functionName) {
 			this.dispatcher.ignoreFunction(functionName);
 			return this;
 		}  
+		
+		/**
+		 * 设置调试状态，该状态会打印调用信息
+		 * @param debug 是否打印
+		 * @return
+		 */
+		public Builder enableDebug(boolean debug) {
+			this.dispatcher.setDebug(debug);
+			return this;
+		} 
 	}
 	
 	static NetSessionEventHandler defaultHandler = new NetSessionEventHandler() {
@@ -165,6 +242,9 @@ public class ApcClientFactory  {
 	final private String name;
 	final private int maxApcLength;
 	final private Map<ChannelOption<?>, Object> options;
+	final private EventExecutorGroupItem ioEventExecutorGroupItem;
+	final private EventExecutorGroupItem apcEventExecutorGroupItem;
+	
 	private ApcClientFactory(
 			ApcSerializer codec, 
 			EventExecutorGroup apcExecutorGroup, 
@@ -189,6 +269,8 @@ public class ApcClientFactory  {
 		this.maxApcLength = maxApcLength;
 		this.options = options;
 		this.apcExecutorGroup = apcExecutorGroup;
+		this.ioEventExecutorGroupItem = new EventExecutorGroupItem(nioEventLoopGroup);
+		this.apcEventExecutorGroupItem = new EventExecutorGroupItem(apcExecutorGroup);
 	}
 
 	public ClientNetSession connect(String ip, int port) {
@@ -247,7 +329,10 @@ public class ApcClientFactory  {
 					
 					session.setChannel(ch);
 					
-					p.addLast(new ReadTimeoutHandler(readTimeout));
+					if (readTimeout != 0)
+					{
+						p.addLast(new ReadTimeoutHandler(readTimeout));
+					}
 					
 					apcSerializer.addPreHandler(ch.eventLoop(), p);
 
@@ -271,7 +356,7 @@ public class ApcClientFactory  {
 			nioEventLoopGroup.shutdownGracefully();
 		}
 		
-		NettyEventExecutorGroupMonitor.unmonitorApcClientFactory(this);
+		EventExecutorGroupItems.unmonitorApcClientFactory(this);
 	}
 	
 	public EventExecutorGroup getApcExecutorGroup() {
@@ -284,5 +369,13 @@ public class ApcClientFactory  {
 	
 	public String getName() {
 		return name;
+	}
+	
+	public EventExecutorGroupItem getApcEventExecutorGroupItem() {
+		return apcEventExecutorGroupItem;
+	}
+	
+	public EventExecutorGroupItem getIoEventExecutorGroupItem() {
+		return ioEventExecutorGroupItem;
 	}
 }

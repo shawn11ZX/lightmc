@@ -60,8 +60,8 @@ public class ClientNetSession extends AbstractNetSession {
 	/**
 	 * This method may cause memory leak if used uncarefully.
 	 * One should call disableAutoReconnect before abandon this NetSession
-	 * @param checkInterval
-	 * @param calback
+	 * @param checkIntervalSec 自动重练间隔
+	 * @param calback 自动重连回调（通常用来发送心跳）
 	 */
 	public void enableAutoReconnect(int checkIntervalSec, HeartBeatHandler calback)
 	{
@@ -75,6 +75,11 @@ public class ClientNetSession extends AbstractNetSession {
 		
 	}
 	
+	@Override
+	public void closeChannel() {
+		disableAutoReconnect();
+		super.closeChannel();
+	}
 	public void disableAutoReconnect()
 	{
 		
@@ -87,6 +92,8 @@ public class ClientNetSession extends AbstractNetSession {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
+			
+			autoReconnectFuture = null;
 		}
 		
 	}
@@ -104,6 +111,11 @@ public class ClientNetSession extends AbstractNetSession {
 		return port;
 	}
 	
-	
+
+	@Override
+	public String toString() {
+		
+		return '[' + getName() + ']' + channel.toString();
+	}
 
 }

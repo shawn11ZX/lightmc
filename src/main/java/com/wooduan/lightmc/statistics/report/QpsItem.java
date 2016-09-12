@@ -13,7 +13,6 @@ public class QpsItem implements StatisticItem {
 	
 	public void saveAndReset(String name, Map<String, Object> output) {
 		int count = this.countTotal.get();
-		
 		if (lastResetTs != 0) {
 			
 			long currentTs = System.currentTimeMillis();
@@ -25,4 +24,5 @@ public class QpsItem implements StatisticItem {
 		lastResetTs = System.currentTimeMillis();
 		this.countTotal.addAndGet(count * -1);
 	}
+
 }

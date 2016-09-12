@@ -12,8 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class JavaStatisticsItem implements StatisticItem {
-	private static final Logger Logger = LoggerFactory
-			.getLogger(JavaStatisticsItem.class);
 
 	
 	JavaStatisticsItem() {

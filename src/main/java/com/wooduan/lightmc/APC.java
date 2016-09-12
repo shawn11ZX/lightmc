@@ -73,13 +73,15 @@ public class APC extends TraceInfo implements Serializable, ClassAlias {
 	public String toString() {
 		try {
 			StringBuffer sb = new StringBuffer();
-			sb.append("[name=" + functionName);
-			sb.append(", argc=" + parameters.length);
+			sb.append("[" + functionName);
+			sb.append("(" + parameters.length);
 			for (int i = 0; i < parameters.length; i++)
 			{
-				sb.append(String.format(", arg%d=%s", i , parameters[i]));
+				if (i != 0)
+					sb.append(",");
+				sb.append(parameters[i]);
 			}
-			sb.append(']');
+			sb.append(")]");
 			return sb.toString();
 		}
 		catch (Exception e)

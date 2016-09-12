@@ -4,64 +4,123 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class AverageValueItem implements StatisticItem {
-	AtomicInteger countTotal = new AtomicInteger();
-	AtomicLong totalValue = new AtomicLong();
-	volatile long lastResetTs;
+public class AverageValueItem extends StatisticHisotry<AverageValueItem.History> implements StatisticItem {
 	
-	volatile double lastQps;
-	volatile int lastCount;
-	volatile int lastAvgValue;
-	volatile long lastTotalValue;
-	public void record(long timeMicro)
-	{
-		totalValue.addAndGet(timeMicro);
-		countTotal.incrementAndGet();
-	}
-	public double getLastQps()
-	{
-		return lastQps;
-	}
-	
-	public int getLastCount()
-	{
-		return lastCount;
-	}
-	
-	public int getLastAvgValue()
-	{
-		return lastAvgValue;
-	}
-	
-	public long getLastTotalValue()
-	{
-		return lastTotalValue;
-	}
-	public void saveAndReset(String name, Map<String, Object> output) {
-		long timeMicro = totalValue.get();
-		int count = this.countTotal.get();
-		
-		if (count == 0)
-			count = 1;
-		if (lastResetTs != 0) {
-			
-			long currentTs = System.currentTimeMillis();
-			long duration = currentTs - lastResetTs;
-			lastQps = (count * 1.0 / duration);
-			lastCount = count;
-			lastAvgValue = (int)(timeMicro/(count));
-			lastTotalValue = timeMicro;
-			if (duration > 1000 && count > 0) {
-				output.put(name + "_qps", lastQps);
-				output.put(name + "_count", lastCount);
-				output.put(name + "_avgValue", lastAvgValue);
-				output.put(name + "_avgMs", lastAvgValue/1000);
-			}
+	static class History {
+		public History(int totalCount, long totalValue)
+		{
+			this.totalCount = totalCount;
+			this.totalValue = totalValue;
 		}
+		int totalCount;
+		long totalValue;
+	}
+	
+	
+	AtomicInteger totalCount = new AtomicInteger();
+	AtomicLong totalValue = new AtomicLong();
+	
+	
+	public void record(long value)
+	{
+		totalValue.addAndGet(value);
+		totalCount.incrementAndGet();
+	}
+	
+	public int getTotalCount() {
+		return totalCount.get();
+	}
+	
+	public long getTotalValue() {
+		return totalValue.get();
+	}
+	
+	
+	public long getAverageValue()
+	{
+		int count = totalCount.get();
+		if (count == 0)
+		{
+			return 0;
+		}
+		else {
+			return totalValue.get() / count;
+		}
+	}
+	
+	////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////
+	
+	
+	////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////
+	public int getHistoryTotalCount(int historyCount)
+	{
+		int count = 0;
+		
+		for(History history: historyList)
+		{
+			if (historyCount-- <= 0)
+				break;
+			count += history.totalCount;
+		}
+		return count;
+	}
+	
+	public long getHistoryTotalValue(int historyCount)
+	{
+		int value = 0;
+		for(History history: historyList)
+		{
+			if (historyCount-- <= 0)
+				break;
+			value += history.totalValue;
+		}
+		return value;
+	}
+	
+	public long getHistoryAverageValue(int historyCount)
+	{
+		int value = 0;
+		int count = 0;
+		for(History history: historyList)
+		{
+			if (historyCount-- <= 0)
+				break;
+			value += history.totalValue;
+			count += history.totalCount;
+		}
+		if (count > 0)
+		{
+			return value / count;
+		}
+		else {
+			return 0;
+		}
+	}
+	
+	
+	
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+	public void saveAndReset(String name, Map<String, Object> output) {
+		
+		long v = totalValue.get();
+		int c = this.totalCount.get();
+		long avg = (c == 0) ? 0 : (int)(v/(c));
+		
+		addHistory(new History(c, v));
+
+		output.put(name + "_count", c);
+		output.put(name + "_avgValue", avg);
 
 		
-		lastResetTs = System.currentTimeMillis();
 		totalValue.set(0);
-		this.countTotal.set(0);
+		this.totalCount.set(0);
+		
 	}
+	
 }

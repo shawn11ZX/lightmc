@@ -41,8 +41,9 @@ public class EndApcStatisticHandler extends ChannelDuplexHandler
 		if (apc != null)
 		{
 			ctx.attr(ChannelAttributes.CURRENT_READ_APC).set(apc);
+			ctx.fireChannelRead(apc);
 		}
-		super.channelRead(ctx, msg);
+		
 	}
 	
 	

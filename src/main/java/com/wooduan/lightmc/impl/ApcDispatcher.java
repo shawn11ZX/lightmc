@@ -29,12 +29,16 @@ public class ApcDispatcher {
 	private ConcurrentHashMap<String, Entry> methodMap = new ConcurrentHashMap<String, Entry>();
 	private CallbackHook hook;
     private ConcurrentSet<String> ignoredMethods = new ConcurrentSet<String>();
-    
+    private boolean debug = false;
     public ApcDispatcher()
     {
     	
     }
 	
+    public void setDebug(boolean debug) {
+		this.debug = debug;
+	}
+    
     public void setHook(CallbackHook hook)
     {
     	this.hook = hook;
@@ -82,33 +86,36 @@ public class ApcDispatcher {
 	}
 	public void call(NetSession netSession, APC request) throws IllegalAccessException, IllegalArgumentException, InvocationTargetException
 	{
-		String functionName = request.getFunctionName();
-		if(!ignoredMethods.contains(functionName) && methodMap.containsKey(functionName)) {
-			
-			Entry entry = methodMap.get(functionName);
-			
-			try {
-				ApcHelper.setCurrentNetSession(netSession);
-				ApcHelper.setCurrentAPC(request);
-				if (hook != null)
-					hook.preCall(request);
-				
-				entry.method.invoke(entry.instance, request.getParameters());
-				
-				if (hook != null)
-					hook.postCall(request);
-			}
-			catch (Exception e)
+		try {
+			if (debug)
 			{
-				Logger.error("invoking method error {}", request, e);
-				throw new InvocationTargetException(e);
+				Logger.info("processing APC {}, from {}", request, netSession);
 			}
-			finally {
-				ApcHelper.setCurrentAPC(null);
-				ApcHelper.setCurrentNetSession(null);
+			ApcHelper.setCurrentNetSession(netSession);
+			ApcHelper.setCurrentAPC(request);
+			
+			if (hook != null)
+				hook.preCall(request);
+			
+			String functionName = request.getFunctionName();
+			if(!ignoredMethods.contains(functionName) && methodMap.containsKey(functionName)) {
+				Entry entry = methodMap.get(functionName);
+				entry.method.invoke(entry.instance, request.getParameters());
+			} else {
+				Logger.error("the method [" + functionName +"] does not exist", functionName);
 			}
-		} else {
-			Logger.error("the method [" + functionName +"] does not exist, or not registerd with @Procedure {}", functionName);
+		
+			if (hook != null)
+				hook.postCall(request);
+		}
+		catch (Exception e)
+		{
+			Logger.error("invoking method error {}", request, e);
+			throw new InvocationTargetException(e);
+		}
+		finally {
+			ApcHelper.setCurrentAPC(null);
+			ApcHelper.setCurrentNetSession(null);
 		}
 	}
 
